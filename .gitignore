@@ -1,5 +1,9 @@
+public/graphs
+r/cluster.log
+r/regression.log
 .monitor
 node_modules
 data/uploads
 .DS_STORE
 public/.DS_STORE
+.Rapp.history
