@@ -17,67 +17,85 @@ $(document).ready(function () {
       submitReady = false,
       graph = $('#graph .inner');
 
-  // load data
-  $.get('/data', function (data, textStatus, jqXHR) {
-    var data = data.split(',');
-    var count = 0;
-    data.forEach(function (dataSet) {
-      if (++count < 5) {
-        dataSets.append('<label><input type="checkbox" name="data" value="' + dataSet + '">' + dataSet + '</label>');
-      }
-    });
-    dataSets.show();
-    loadingData.hide();
-  });
-
-  // data checkbox togglemania
-  main.find('input[name=data]').live('click', function() {
-    var data = $('[name=data]');
-    if (allInput.is(':checked')) {
-      data.filter(':not([value=all],[value=random])').attr('checked', 'checked');
-      randomLabel.addClass('disabled');
-      randomInput.attr('disabled', 'disabled');
-    } else if (randomInput.is(':checked')) {
-      data.filter(':not([value=random])').attr('disabled', 'disabled').closest('label').addClass('disabled');
-    } else {
-      data.removeAttr('disabled').closest('label').removeClass('disabled');
+  // Graph event handler
+  $('#graph-list label').click(function () {
+    var graphType = $(this).find('input').val();
+    $('#options .graph-option').hide();
+    $('#options #graph-details-' + graphType).show();
+    if ($('#options').css('display') == 'none') {
+      $('#options').slideDown();
     }
     toggleSubmit();
   });
 
-  // add data set
-  main.find('#add-data-set a').click(function () {
-    ads.toggle();
-    $(this).toggle();
+  $('input[name=random5]').click(function () {
+    // pick 5 random clusters
+    randomClusters = [];
+    for (i = 0; i < 5; i++) {
+      randomClusters.push(Math.floor(Math.random() * (173 - 1 + 1) + 1));
+    }
+    // usability win: actually select them in the `select` menu
+    $('select[name=clusters] option').removeAttr('selected');
+    randomClusters.forEach(function (clusterNum) {
+      console.log(clusterNum);
+      $('select[name=clusters] option[value=cluster' + clusterNum + ']').attr('selected', 'selected');
+    });
+    $('input[name=randomClusterNum]').val(randomClusters.join(','));
+    toggleSubmit();
   });
-  adsInput.change(function () {
-    adsmain.submit();
+
+  $('select[name=clusters]').click(function () {
+    $('input[name=random5]').removeAttr('checked');
+    toggleSubmit();
+  });
+
+  $('div.color').each(function () {
+    var $this = $(this);
+    var defaultRGB = $this.find('input').val();
+    var defaultRGBSplit = defaultRGB.split(',');
+    $this.find('.colorsub').css('backgroundColor', 'rgb(' + defaultRGB + ')');
+    $this.ColorPicker({
+     color: '#' + rgbToHex(defaultRGBSplit[0], defaultRGBSplit[1], defaultRGBSplit[2]),
+     onShow: function (colpkr) {
+       $(colpkr).fadeIn(500);
+       return false;
+     },
+     onHide: function (colpkr) {
+       $(colpkr).fadeOut(500);
+       return false;
+     },
+     onChange: function (hsb, hex, rgb) {
+       $this.find('.colorsub').css('backgroundColor', '#' + hex);
+       $this.find('input').val(rgb.r + ',' + rgb.g + ',' + rgb.b);
+     }
+    });
   });
 
   // pseudo main submission
-  var formSubmit = function (event) {
+  $('#form-submit').click(function () {
     event.preventDefault();
 
-    var processData = {},
-        dataSets = [];
+    $('#graph-will-load-here').hide();
+    $('#graph img').hide();
+    $('#graph-loading').show();
 
-    $('#data-sets input[type=checkbox]').filter(':not([value=random],[value=all])').each(function () {
-      if ($(this).is(':checked')) {
-        dataSets.push($(this).val());
-      }
+    var processData = {},
+        clusters = [],
+        i;
+
+    processData.graph = $('#graph-list input:checked').val();
+
+    processData.visual = [];
+    $('#graph-details-' + processData.graph + ' input[data-visual=true]').each(function () {
+      processData.visual.push($(this).attr('name') + '=' + $(this).val());
     });
 
-    if (dataSets.length === 0) {
-      // all or random was checked
-      if (data.filter('[value=all]').is(':checked')) {
-        dataSets.push('all');
-      } else {
-        dataSets.push('random');
-      }
-    }
+    $('select[name=clusters] option:selected').each(function () {
+      clusters.push($(this).val().split('cluster')[1]);
+    });
+    processData.clusters = clusters.join(',');
 
-    processData.dataSets = dataSets;
-    processData.process = main.find('input[name=process]:checked').val();
+    processData.process = 'cluster';
 
     console.log('The following data is /process\'d');
     console.log(processData);
@@ -87,21 +105,37 @@ $(document).ready(function () {
       // `data` should be the path to the graph, relative to the graphs/ directory
       // put the graph into place
       var url = data.split('GRAPH_PRE')[1].split('GRAPH_POST')[0];
-      graph.html('<img src="graphs/' + url + '" />');
+      $('#graph-loading').hide();
+      $('#graph .inner').append('<img src="graphs/' + url + '" />');
     });
-  };
+  });
+
+  // credit: http://www.javascripter.net/faq/rgbtohex.htm
+  function rgbToHex(R,G,B) {return toHex(R)+toHex(G)+toHex(B)}
+  function toHex(n) {
+   n = parseInt(n,10);
+   if (isNaN(n)) return "00";
+   n = Math.max(0,Math.min(n,255));
+   return "0123456789ABCDEF".charAt((n-n%16)/16)
+        + "0123456789ABCDEF".charAt(n%16);
+  }
 
   // submit button togglemania
   function toggleSubmit() {
-    var processVal = $('[name=process]:checked').val();
-    if ($('input[name=data]').filter(':not([value=all],[value=random]):checked').length > 0 && (processVal === 'regression' || processVal === 'cluster')) {
+    var graphChecked = $('#graph-list input:checked');
+    var graphVal = graphChecked.val();
+    var clustersSelected = $('select[name=clusters] option:selected');
+    var formReady = 
+      (graphVal === 'bivariate' && clustersSelected.length > 0)
+      || (graphVal === 'silhouette');
+    if (formReady) {
       submitP.slideUp();
       submitButton.removeClass('disabled');
-      main.find('.submit a').bind('click', formSubmit);
+      submitButton.removeAttr('disabled');
     } else {
       submitButton.addClass('disabled');
       submitP.slideDown();
-      main.find('.submit a').unbind('click');
+      submitButton.attr('disabled', 'disabled');
     }
   }
   toggleSubmit();

@@ -157,6 +157,57 @@ label, input[type=submit] {
   padding: 1em 0;
 }
 
+/* Options */
+#options {
+  display: none;
+}
+#options .graph-option {
+  display: none;
+}
+#options fieldset {
+  font-size: 90%;
+}
+#options fieldset + fieldset {
+  margin-top: 1em;
+}
+#options fieldset legend {
+  border-bottom: 1px solid #eee;
+  color: #878787;
+  display: block;
+  font-size: 110%;
+  margin-bottom: 1em;
+  padding-bottom: 0.5em;
+  width: 100%;
+}
+#options fieldset .fieldset-inner {
+  padding: 1em;
+}
+#options label, select {
+  display: block;
+}
+#options select[multiple] {
+  width: 90%;
+}
+#options select[multiple] option {
+  padding: 0.5em;
+}
+#options .visual {
+  clear: both;
+}
+#options .visual {
+  margin: 0.5em 0;
+  overflow: hidden;
+}
+#options .visual label {
+  float: left;
+}
+#options .visual label:after {
+  content: ':';
+}
+#options .visual .color-container {
+  float: right;
+}
+
 /* Graph */
 #graph {
   border: 1px solid #eee;
@@ -165,6 +216,16 @@ label, input[type=submit] {
 }
 #graph .inner {
   padding: 1em;
+}
+#graph .inner p {
+  color: gray;
+  margin: 2em auto;
+  text-align: center;
+}
+#graph-loading {
+  background: url(loading.gif) no-repeat bottom center;
+  display: none;
+  height: 100px;
 }
 
 /* Footer */
@@ -190,4 +251,20 @@ label, input[type=submit] {
   color: #8F8F8F;
   content: "@";
   text-decoration: none;
+}
+
+/* ColorPicker */
+div.color {
+	position: relative;
+	width: 36px;
+	height: 36px;
+	background: url(images/select.png);
+}
+div.color .colorsub {
+	position: absolute;
+	top: 3px;
+	left: 3px;
+	width: 30px;
+	height: 30px;
+	background: url(images/select.png) center;
 }
