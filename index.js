@@ -21,61 +21,72 @@ var GRAPHS_DIR = 'graphs/',
       regression : 'r/regression.r'
     };
 
-function getTemplate(templateName) {
-  return fs.readFileSync('client/' + templateName + '.html').toString().replace('ROOT_PATH', ROOT_PATH);
-}
+// Create a tmp directory or replace the old one
+console.log('Clearing public/tmp/ directory...');
+childProcess.exec('rm public/tmp/*.tar');
 
 var server = express.createServer();
 
 server.use(express.bodyParser())
   .use(express.static(__dirname + '/public'))
 
-server.get('/data', function (req, res) {
-  var dataSets = [];
-  fs.readdir(DATA_ROOT, function (err, files) {
-    dataSets = _.without(files, DATA_USER);
-    fs.readdir(DATA_ROOT + DATA_USER, function (err, files) {
-      files = _.map(files, function (file) { return DATA_USER + '/' + file; });
-      dataSets = _.union(dataSets, files);
-      res.end(dataSets.join(','));
+server.get('/cleargraphs', function (req, res) {
+  console.log('Clearing graphs...');
+  childProcess.exec('rm public/graphs/*.png', function () {
+    childProcess.exec('rm public/graphs/*.pdf', function () {
+      res.end('done');
     });
+  })
+});
+
+server.get('/graphs', function (req, res) {
+  console.log('Getting graphs...');
+  fs.readdir('public/graphs', function (err, files) {
+    res.end(_.map(_.filter(files, function (file) { return file.substring(file.length - 4, file.length) === '.png'; }), function (file) { return 'graphs/' + file; }).join(','));
   });
 });
 
-server.post('/upload', function (req, res) {
-  var uploadFile = req.files.dataUpload;
-  if (!uploadFile) {
-    res.end('Error: no file passed');
-  }
+server.get('/tar', function (req, res) {
+  console.log('Building tarball of pngs...');
+  var publicTarURL = 'tmp/graphs_png_' + new Date().getTime() + '.tar';
+  childProcess.exec('tar czf public/' + publicTarURL + ' public/graphs/*.png', function (error, stdout, stderr) {
+    if (error) {
+      throw error;
+    }
+    res.end(publicTarURL);
+  });
+});
 
-  // move file to data dir
-  var copyProc = childProcess.spawn('cp', [uploadFile.path, DATA_ROOT + DATA_USER + '/' + uploadFile.name]);
-  copyProc.on('exit', function (exitCode) {
-    res.redirect('/');
+server.get('/pdf', function (req, res) {
+  console.log('Building tarball of pdfs...');
+  var publicTarURL = 'tmp/graphs_pdf_' + new Date().getTime() + '.tar';
+  childProcess.exec('tar czf public/' + publicTarURL + ' public/graphs/*.pdf', function (error, stdout, stderr) {
+    if (error) {
+      throw error;
+    }
+    res.end(publicTarURL);
   });
 });
 
 server.post('/process', function (req, res) {
+  console.log('Processing graph...');
   var clusters = req.body.clusters ? 'clusters=' + req.body.clusters : '',
       graph = 'graph=' + req.body.graph,
       process = req.body.process,
-      visual = req.body.visual;
-
-  console.log(visual);
+      visual = req.body.visual,
+      options = req.body.options;
 
   if (process != 'cluster' && process != 'regression') {
     res.end('Error: data sent is not valid');
   }
 
-  var args = _.union([SCRIPT_MAP[process]], graph, clusters, visual);
-  console.log('Rscript ' + args.join(' '));
-  var rProc = childProcess.exec('Rscript ' + args.join(' '), function (error, stdout, stderr) {
-    console.log('stdout: ' + stdout);
-    console.log('stderr: ' + stderr);
-    res.end(stdout || stderr);
-    if (error !== null) {
-      console.log('exec error: ' + error);
+  var args = _.union([SCRIPT_MAP[process]], graph, clusters, visual, options);
+  console.log('Invoking Rscript ' + args.join(' '));
+  childProcess.exec('Rscript ' + args.join(' '), function (error, stdout, stderr) {
+    if (error) {
+      throw error;
     }
+    res.end(stdout || stderr);
   });
 });
 server.listen(1337);

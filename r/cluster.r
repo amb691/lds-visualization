@@ -1,6 +1,8 @@
 require(RSQLite);
 require(cluster);
 
+source("r/helpers.r");
+
 debug <- TRUE;
 # Open a sink for logging
 sink("r/cluster.log");
@@ -25,6 +27,10 @@ gene <- "undefined";
 
 clustersString <- c();
 
+# Initialize some args for later
+biv.viz.shade <- FALSE;
+biv.viz.color <- FALSE;
+
 print("args:");
 for (arg in args) {
   print(arg);
@@ -44,6 +50,18 @@ for (arg in args) {
       biv.viz.col.txt <- val;
     } else if (key == 'bivariate-colclus') {
       biv.viz.col.clus <- val;
+    } else if (key == 'bivariate-colclus2') {
+      biv.viz.col.clus2 <- val;
+    } else if (key == 'bivariate-colclus3') {
+      biv.viz.col.clus3 <- val;
+    } else if (key == 'bivariate-colclus4') {
+      biv.viz.col.clus4 <- val;
+    } else if (key == 'bivariate-fontfamily') {
+      biv.viz.font <- val;
+    } else if (key == 'bivariate-options-shade') {
+      biv.viz.shade <- TRUE;
+    } else if (key == 'bivariate-options-color') {
+      biv.viz.color <- TRUE;
     }
   }
 }
@@ -76,11 +94,9 @@ if (length(clustersString) > 0) {
   sqlClusterAppend <- paste("WHERE out IN (", clustersString, ")", sep="");
 }
 
-
 if (debug) print('s');
 
 sql.clusters <- dbConnect(dbDriver, dbname = sql.info.final_clusters);
-
 
 if (debug) print('t');
 
@@ -97,7 +113,6 @@ if (length(clustersString) > 0) {
   sql.clusters.ratios <- dbGetQuery(sql.clusters, paste("SELECT * FROM ba_ratios", sqlLimitAppend));
 }
 sql.clusters.ratios <- sql.clusters.ratios[-c(1,53,54)];
-
 
 if (debug) print('z');
 
@@ -120,16 +135,13 @@ if (debug) print('f');
 
 # Plot graph depending on what graph type was requested
 
-graph_path <- paste(GRAPHS_DIR, '/', sep = "");
-graph_filename <- paste(unclass(Sys.time()), '.png', sep = "");
+graph.path <- paste(GRAPHS_DIR, '/', sep = "");
+graph.salt <- paste(unclass(Sys.time()), "_", sample(5000:50000, 1), sep="");
+graph.filename.png <- paste(graph.salt, '.png', sep = "");
+graph.filename.pdf <- paste(graph.salt, '.pdf', sep = "");
 
-png(paste(graph_path, graph_filename, sep = ""));
-
-
-parseRGB <- function(parseString) {
-  stringSplit <- unlist(strsplit(parseString, ","));
-  rgb(stringSplit[1], stringSplit[2], stringSplit[3], maxColorValue = 255);
-}
+# Save a copy of par() so we can reset it later
+par.initial <- par();
 
 if (graph_type == 'silhouette') {
 
@@ -140,25 +152,42 @@ if (graph_type == 'silhouette') {
 
 } else if (graph_type == 'bivariate') {
 
-  # get visual parameters
-  col.p <- unlist(strsplit(biv.viz.col.p, ","));
-  col.txt <- unlist(strsplit(biv.viz.col.txt, ","));
-  col.clus <- unlist(strsplit(biv.viz.col.clus, ","));
+  if (biv.viz.color == TRUE) {
+    biv.viz.col.clus <- c(helpers.parseRGB(biv.viz.col.clus), helpers.parseRGB(biv.viz.col.clus2), helpers.parseRGB(biv.viz.col.clus3), helpers.parseRGB(biv.viz.col.clus4));
+  } else {
+    biv.viz.col.clus <- helpers.parseRGB(biv.viz.col.clus);
+  }
 
-  clusplot(
-    sql.clusters.ratios,
-    sql.clusters.k173,
-    main = paste("Bivariate Cluster Plot of Clusters", clustersString),
-    col.p = parseRGB(biv.viz.col.p),
-    col.txt = parseRGB(biv.viz.col.txt),
-    col.clus = parseRGB(biv.viz.col.clus),
-    verbose = TRUE
-  );
+  clustFunc <- function () {
+    print(paste("Font:", biv.viz.font));
+    par(family = biv.viz.font);
+    clusplot(
+      sql.clusters.ratios,
+      sql.clusters.k173,
+      main = paste("Bivariate Cluster Plot of Clusters", clustersString),
+      col.p = helpers.parseRGB(biv.viz.col.p),
+      col.txt = helpers.parseRGB(biv.viz.col.txt),
+      col.clus = biv.viz.col.clus,
+      verbose = TRUE,
+      shade = biv.viz.shade,
+      color = biv.viz.color
+    );
+  }
+
+  png(paste(graph.path, graph.filename.png, sep = ""));
+  clustFunc();
+
+  pdf(file = paste(graph.path, graph.filename.pdf, sep = ""));
+  clustFunc();
 
 }
+
+# Reset par
+par(par.initial);
 
 dev.off();
 
 sink();
 
-print(paste("GRAPH_PRE", graph_filename, "GRAPH_POST", sep = ""));
+# Output the path of the new graph 
+print(paste("GRAPH_PRE", graph.filename.png, "GRAPH_POST", sep = ""));
